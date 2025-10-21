@@ -1,0 +1,11 @@
+# Core dependencies
+google-cloud-bigquery
+mcp
+
+# HTTP transport (default mode)
+fastapi
+uvicorn[standard]
+
+# Optional: Ngrok support for sharing
+# Uncomment if you want to use --ngrok flag
+pyngrok
