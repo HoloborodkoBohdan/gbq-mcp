@@ -1,6 +1,7 @@
 # Core dependencies
 google-cloud-bigquery
 mcp
+python-dotenv
 
 # HTTP transport (default mode)
 fastapi

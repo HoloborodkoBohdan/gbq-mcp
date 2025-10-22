@@ -235,7 +235,7 @@ def _handle_query_error(error: Exception) -> ValueError:
 
 
 def create_http_app():
-    """Create HTTP transport app with CORS middleware for cloud deployments."""
+    """Create HTTP transport app with CORS middleware for local access and ngrok sharing."""
     try:
         from fastapi.middleware.cors import CORSMiddleware
 
@@ -258,8 +258,9 @@ def create_http_app():
 if __name__ == "__main__":
     import sys
 
-    # Default to HTTP mode for production deployment
+    # Default to HTTP mode for local access
     # Use --stdio flag for Desktop Agent integration
+    # Use --ngrok flag to share publicly
     if len(sys.argv) > 1 and sys.argv[1] == "--stdio":
         print("Starting in stdio mode...")
         app.run()
@@ -296,7 +297,7 @@ if __name__ == "__main__":
             print("  Terminal 2: ngrok http 8000")
             sys.exit(1)
     else:
-        # HTTP mode (default for deployment)
+        # HTTP mode (default for local access)
         try:
             import uvicorn
             http_app = create_http_app()
@@ -304,6 +305,7 @@ if __name__ == "__main__":
             print(f"Starting HTTP server on port {port}...")
             print(f"Server running at: http://localhost:{port}")
             print(f"Health check: http://localhost:{port}/health")
+            print(f"\nTip: Use 'python server.py --ngrok' to share publicly")
             uvicorn.run(http_app, host="0.0.0.0", port=port)
         except ImportError:
             print("Error: uvicorn is required for HTTP mode.")

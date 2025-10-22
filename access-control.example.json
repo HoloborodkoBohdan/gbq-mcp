@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Access control configuration for BigQuery MCP Server",
+
+  "allowed_tables": [
+    "bigquery-public-data.iowa_liquor_sales.sales"
+  ],
+
+  "allowed_datasets": {
+    "bigquery-public-data.austin_bikeshare": {
+      "allow_all_tables": true,
+      "blacklisted_tables": [],
+      "description": "Austin bike sharing system - all tables allowed"
+    }
+  },
+
+  "allowed_patterns": [],
+
+  "_comments": {
+    "allowed_tables": "Explicit whitelist of specific tables (project.dataset.table format)",
+    "allowed_datasets": "Dataset-level access with optional blacklist. Set allow_all_tables=true to allow all tables in dataset",
+    "allowed_patterns": "Wildcard patterns using fnmatch style (e.g., 'bigquery-public-data.*', 'my-project.*.sales*')",
+    "examples": {
+      "allowed_tables_example": [
+        "my-project.analytics.users",
+        "my-project.analytics.events",
+        "bigquery-public-data.samples.wikipedia"
+      ],
+      "allowed_datasets_example": {
+        "my-project.production": {
+          "allow_all_tables": true,
+          "blacklisted_tables": ["sensitive_data", "internal_metrics"],
+          "description": "Production dataset - all tables except blacklisted"
+        },
+        "bigquery-public-data.covid19_italy": {
+          "allow_all_tables": true,
+          "blacklisted_tables": [],
+          "description": "COVID-19 Italy public dataset"
+        }
+      },
+      "allowed_patterns_example": [
+        "bigquery-public-data.*",
+        "my-project.analytics.*",
+        "*.public.*"
+      ]
+    }
+  }
+}

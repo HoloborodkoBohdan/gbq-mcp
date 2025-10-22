@@ -3,10 +3,9 @@
 Production-ready MCP server for secure, read-only access to Google BigQuery datasets. Features table-level access control, query cost estimation, HTTP transport, and comprehensive security validation.
 
 **📚 Documentation:**
-- [Architecture & SOLID Principles](ARCHITECTURE.md) - System design and architecture
-- [WSL Setup Guide](WSL_SETUP.md) - Windows + WSL configuration
-- [Ngrok Sharing Guide](NGROK_SETUP.md) - Share server with others
-- [Changelog](CHANGELOG.md) - Recent improvements
+- [Architecture](docs/ARCHITECTURE.md) - System design and architecture
+- [WSL Setup Guide](docs/WSL_SETUP.md) - Windows + WSL configuration
+- [Ngrok Sharing Guide](docs/NGROK_SETUP.md) - Share server with others
 
 ## Quick Start
 
@@ -66,7 +65,7 @@ python server.py --ngrok
 # Share this URL with anyone!
 ```
 
-📖 **See [NGROK_SETUP.md](NGROK_SETUP.md) for complete ngrok guide with authentication, monitoring, and troubleshooting.**
+📖 **See [docs/NGROK_SETUP.md](docs/NGROK_SETUP.md) for complete ngrok guide with authentication, monitoring, and troubleshooting.**
 
 ## Connect to Desktop Agent
 
@@ -92,7 +91,7 @@ Restart Desktop Agent. You should see the MCP server connected with 4 tools avai
 
 ### Windows + WSL
 
-📖 **See [WSL_SETUP.md](WSL_SETUP.md) for complete Windows + WSL configuration guide.**
+📖 **See [docs/WSL_SETUP.md](docs/WSL_SETUP.md) for complete Windows + WSL configuration guide.**
 
 Quick configuration:
 ```json
@@ -112,11 +111,11 @@ Quick configuration:
 
 Replace `YOUR_USERNAME` with your WSL username.
 
-## HTTP Deployment (Production)
+## Local HTTP Server
 
-The server runs in HTTP mode by default, making it easy to deploy to cloud platforms.
+The server runs in HTTP mode by default for local testing and development.
 
-### Local Testing
+### Start Local HTTP Server
 
 ```bash
 # Start HTTP server
@@ -127,83 +126,6 @@ curl http://localhost:8000/health
 
 # Access in browser
 open http://localhost:8000
-```
-
-### Deploy to Cloud Run (Google Cloud)
-
-```bash
-# Build container
-gcloud builds submit --tag gcr.io/YOUR_PROJECT/bigquery-mcp
-
-# Deploy
-gcloud run deploy bigquery-mcp \
-  --image gcr.io/YOUR_PROJECT/bigquery-mcp \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated
-```
-
-### Deploy to Railway
-
-1. Connect your GitHub repo to Railway
-2. Set environment variables in Railway dashboard
-3. Railway auto-detects Python and runs `python server.py`
-
-### Deploy to Fly.io
-
-```bash
-# Initialize
-fly launch
-
-# Deploy
-fly deploy
-
-# Check status
-fly status
-```
-
-### Deploy to any VPS/Server
-
-```bash
-# Clone repo
-git clone <your-repo>
-cd mcp-gbq
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run with systemd (keeps running)
-sudo nano /etc/systemd/system/bigquery-mcp.service
-```
-
-```ini
-[Unit]
-Description=BigQuery MCP Server
-After=network.target
-
-[Service]
-Type=simple
-User=your-user
-WorkingDirectory=/path/to/mcp-gbq
-ExecStart=/usr/bin/python3 server.py 8000
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl enable bigquery-mcp
-sudo systemctl start bigquery-mcp
-```
-
-### Environment Variables for Deployment
-
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-ALLOWED_TABLES=project.dataset.table1,project.dataset.table2
-MAX_QUERY_RESULTS=10000
-MAX_BYTES_BILLED_MB=100
 ```
 
 ## Testing with MCP Inspector
@@ -364,20 +286,23 @@ The server uses proper async context management for BigQuery client lifecycle:
 
 ### HTTP Transport
 
-Deploy the server with HTTP transport for cloud environments:
+Run the server with HTTP transport for local access or sharing via ngrok:
 
 ```bash
-# Start HTTP server
-python server.py --http 8000
+# Start HTTP server (local access)
+python server.py 8000
+
+# Share publicly via ngrok
+python server.py --ngrok
 
 # Access via HTTP endpoint
 curl http://localhost:8000
 ```
 
 **Use cases:**
-- Deploy to Cloud Run, Cloud Functions, or other serverless platforms
+- Local testing and development
+- Share with others via ngrok
 - Access from web applications
-- Run behind a load balancer
 
 ### Cost Estimation (Dry-run)
 
@@ -457,13 +382,6 @@ Browse public datasets: https://console.cloud.google.com/marketplace/browse?filt
 Edit `server.py` to adjust:
 - `max_results` limit (currently 10,000 rows)
 - `maximum_bytes_billed` (currently 100 MB)
-
-### Deploy as Service
-
-Consider deploying with:
-- Docker container
-- Cloud Run / Cloud Functions
-- systemd service on Linux
 
 ### Add Features
 
