@@ -1,10 +1,15 @@
 """Backward-compatible helper functions using new services."""
 
+import os
 from typing import Dict, Any, Tuple
+
+from dotenv import load_dotenv
 
 from services.query_validator import QueryValidatorService
 from services.access_control import AccessControlService
 from services.configuration import AccessConfig
+
+load_dotenv()
 
 FORBIDDEN_KEYWORDS = (
     "DELETE", "UPDATE", "INSERT", "CREATE", "DROP", "ALTER",
@@ -47,13 +52,3 @@ def match_table_pattern(table: str, pattern: str) -> bool:
     """Match table ID against a wildcard pattern."""
     import fnmatch
     return fnmatch.fnmatch(table, pattern)
-
-
-def get_allowed_tables_from_env() -> list[str]:
-    """Get allowed tables from environment variable."""
-    import os
-    env_tables = os.getenv("ALLOWED_TABLES")
-    if not env_tables:
-        return []
-
-    return [table.strip() for table in env_tables.split(",") if table.strip()]

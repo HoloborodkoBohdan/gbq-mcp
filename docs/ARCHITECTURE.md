@@ -72,15 +72,21 @@
                │
                ├─────────────────────────────┐
                │                             │
-               ▼                             ▼
-┌──────────────────────────┐   ┌────────────────────────────┐
-│ ConfigurationService     │   │ EnvironmentConfiguration   │
-│ (Default/File-based)     │   │        Service             │
-├──────────────────────────┤   ├────────────────────────────┤
-│ • Default config         │   │ • Load from ENV vars       │
-│ • service-account.json   │   │ • ALLOWED_TABLES           │
-│ • Hard-coded defaults    │   │ • MAX_QUERY_RESULTS        │
-└──────────────────────────┘   └────────────────────────────┘
+               ▼
+┌──────────────────────────────────────────┐
+│ ConfigurationService                     │
+│ (File-based + Environment Variables)     │
+├──────────────────────────────────────────┤
+│ • Loads .env file with dotenv            │
+│ • access-control.json for tables         │
+│ • service-account.json for auth          │
+│ • Environment variables:                 │
+│   - ACCESS_CONTROL_FILE                  │
+│   - MAX_QUERY_RESULTS                    │
+│   - MAX_BYTES_BILLED_MB                  │
+│   - GOOGLE_APPLICATION_CREDENTIALS       │
+│ • Falls back to defaults if missing      │
+└──────────────────────────────────────────┘
 ```
 
 **Benefits:**

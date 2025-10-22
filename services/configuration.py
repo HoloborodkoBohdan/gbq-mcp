@@ -4,7 +4,10 @@ import json
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Any, Optional
+
+from dotenv import load_dotenv
 
 
 @dataclass
@@ -18,8 +21,8 @@ class AccessConfig:
 @dataclass
 class QueryLimits:
     """Query execution limits."""
-    max_results: int = 10000
-    maximum_bytes_billed: int = 100 * 1024 * 1024  # 100 MB
+    max_results: int
+    maximum_bytes_billed: int
 
 
 class IConfigurationProvider(ABC):
@@ -50,9 +53,11 @@ class ConfigurationService(IConfigurationProvider):
         query_limits: Optional[QueryLimits] = None,
         service_account_path: Optional[str] = None
     ):
-        self._access_config = access_config or self._get_default_access_config()
-        self._query_limits = query_limits or QueryLimits()
-        self._service_account_path = service_account_path or self._get_default_service_account_path()
+        load_dotenv()
+
+        self._access_config = access_config or self._load_access_config()
+        self._query_limits = query_limits or self._load_query_limits()
+        self._service_account_path = service_account_path or self._load_service_account_path()
 
     def get_access_config(self) -> AccessConfig:
         """Get access control configuration."""
@@ -80,11 +85,42 @@ class ConfigurationService(IConfigurationProvider):
                 return None
         return None
 
-    @staticmethod
-    def _get_default_service_account_path() -> str:
-        """Get default service account path."""
+    def _load_service_account_path(self) -> str:
+        """Load service account path from environment or default."""
+        env_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if env_path:
+            return env_path
+
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(script_dir, "service-account.json")
+
+    def _load_query_limits(self) -> QueryLimits:
+        """Load query limits from environment variables."""
+        max_results = int(os.getenv("MAX_QUERY_RESULTS", "10000"))
+        max_bytes_mb = int(os.getenv("MAX_BYTES_BILLED_MB", "100"))
+
+        return QueryLimits(
+            max_results=max_results,
+            maximum_bytes_billed=max_bytes_mb * 1024 * 1024
+        )
+
+    def _load_access_config(self) -> AccessConfig:
+        """Load access configuration from environment or file."""
+        access_control_file = os.getenv("ACCESS_CONTROL_FILE", "./access-control.json")
+
+        if os.path.exists(access_control_file):
+            try:
+                with open(access_control_file, 'r') as f:
+                    config_data = json.load(f)
+                    return AccessConfig(
+                        allowed_tables=config_data.get("allowed_tables", []),
+                        allowed_datasets=config_data.get("allowed_datasets", {}),
+                        allowed_patterns=config_data.get("allowed_patterns", [])
+                    )
+            except (IOError, json.JSONDecodeError) as e:
+                print(f"Warning: Failed to load {access_control_file}: {e}")
+
+        return self._get_default_access_config()
 
     @staticmethod
     def _get_default_access_config() -> AccessConfig:
@@ -100,48 +136,4 @@ class ConfigurationService(IConfigurationProvider):
                 },
             },
             allowed_patterns=[]
-        )
-
-
-class EnvironmentConfigurationService(ConfigurationService):
-    """Configuration service that loads from environment variables."""
-
-    def __init__(self):
-        access_config = self._load_access_config_from_env()
-        query_limits = self._load_query_limits_from_env()
-        service_account_path = os.getenv(
-            "GOOGLE_APPLICATION_CREDENTIALS",
-            self._get_default_service_account_path()
-        )
-
-        super().__init__(access_config, query_limits, service_account_path)
-
-    @staticmethod
-    def _load_access_config_from_env() -> AccessConfig:
-        """Load access configuration from environment variables."""
-        allowed_tables_str = os.getenv("ALLOWED_TABLES", "")
-        allowed_tables = [
-            table.strip()
-            for table in allowed_tables_str.split(",")
-            if table.strip()
-        ] if allowed_tables_str else []
-
-        if not allowed_tables:
-            return ConfigurationService._get_default_access_config()
-
-        return AccessConfig(
-            allowed_tables=allowed_tables,
-            allowed_datasets={},
-            allowed_patterns=[]
-        )
-
-    @staticmethod
-    def _load_query_limits_from_env() -> QueryLimits:
-        """Load query limits from environment variables."""
-        max_results = int(os.getenv("MAX_QUERY_RESULTS", "10000"))
-        max_bytes_mb = int(os.getenv("MAX_BYTES_BILLED_MB", "100"))
-
-        return QueryLimits(
-            max_results=max_results,
-            maximum_bytes_billed=max_bytes_mb * 1024 * 1024
         )

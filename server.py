@@ -4,10 +4,14 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Dict, Any
 
+from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import bigquery
 from mcp.server.fastmcp import FastMCP
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 from services.configuration import ConfigurationService
 from services.bigquery_client import BigQueryClientService
@@ -51,7 +55,28 @@ app = FastMCP("bigquery-mcp", lifespan=lifespan)
 
 def get_context() -> AppContext:
     """Get application context with all services."""
-    return app.get_context(AppContext)
+    ctx = app.get_context()
+    return ctx.request_context.lifespan_context
+
+
+@app.tool()
+def get_query_limits() -> Dict[str, Any]:
+    """Get current BigQuery query limits and configuration."""
+    ctx = get_context()
+    query_limits = ctx.config.get_query_limits()
+
+    return {
+        "limits": {
+            "max_results": query_limits.max_results,
+            "maximum_bytes_billed": query_limits.maximum_bytes_billed,
+            "maximum_bytes_billed_mb": round(query_limits.maximum_bytes_billed / (1024 * 1024), 2),
+            "maximum_bytes_billed_gb": round(query_limits.maximum_bytes_billed / (1024 * 1024 * 1024), 2)
+        },
+        "cost_info": {
+            "rate": "$5.00 per TB (US region)",
+            "note": "Queries are automatically checked against billing limits before execution"
+        }
+    }
 
 
 @app.tool()
@@ -142,11 +167,6 @@ def bq_query(query: str, max_results: int = 1000, confirmed: bool = False) -> Di
 
     Automatically performs dry-run cost estimation first. If query exceeds limits,
     user confirmation is required before execution.
-
-    Args:
-        query: SQL SELECT query to execute
-        max_results: Maximum number of results to return
-        confirmed: Set to True to confirm execution of expensive queries
     """
     ctx = get_context()
     query_limits = ctx.config.get_query_limits()
@@ -157,7 +177,6 @@ def bq_query(query: str, max_results: int = 1000, confirmed: bool = False) -> Di
     ctx.query_validator.validate_or_raise(query)
     ctx.access_control.validate_query_tables(query)
 
-    # Step 1: Always do dry-run first to check cost
     try:
         client = ctx.bq_client_service.get_client()
         dry_run_config = bigquery.QueryJobConfig(dry_run=True, use_query_cache=False)
@@ -168,11 +187,9 @@ def bq_query(query: str, max_results: int = 1000, confirmed: bool = False) -> Di
         bytes_in_gb = bytes_to_process / (1024 * 1024 * 1024)
         estimated_cost_usd = (bytes_to_process / (1024 ** 4)) * 5
 
-        # Step 2: Check if query exceeds limits
         exceeds_limit = bytes_to_process > query_limits.maximum_bytes_billed
 
         if exceeds_limit and not confirmed:
-            # Query exceeds limits - require user confirmation
             return {
                 "requires_confirmation": True,
                 "message": "Query exceeds billing limits. Review cost and confirm to proceed.",
@@ -187,7 +204,6 @@ def bq_query(query: str, max_results: int = 1000, confirmed: bool = False) -> Di
                 "query": query
             }
 
-        # Step 3: Execute query (either within limits or user confirmed)
         job_config = bigquery.QueryJobConfig(
             maximum_bytes_billed=bytes_to_process if exceeds_limit else query_limits.maximum_bytes_billed
         )
@@ -237,9 +253,28 @@ def _handle_query_error(error: Exception) -> ValueError:
 def create_http_app():
     """Create HTTP transport app with CORS middleware for local access and ngrok sharing."""
     try:
-        from fastapi.middleware.cors import CORSMiddleware
+        async def health_check(request):
+            return JSONResponse({
+                "status": "healthy",
+                "service": "bigquery-mcp",
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            })
+
+        async def root(request):
+            return JSONResponse({
+                "service": "BigQuery MCP Server",
+                "status": "running",
+                "endpoints": {
+                    "health": "/health",
+                    "mcp": "/mcp"
+                }
+            })
 
         http_app = app.streamable_http_app()
+
+        http_app.routes.insert(0, Route("/health", health_check, methods=["GET"]))
+        http_app.routes.insert(0, Route("/", root, methods=["GET"]))
+
         http_app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -258,14 +293,10 @@ def create_http_app():
 if __name__ == "__main__":
     import sys
 
-    # Default to HTTP mode for local access
-    # Use --stdio flag for Desktop Agent integration
-    # Use --ngrok flag to share publicly
     if len(sys.argv) > 1 and sys.argv[1] == "--stdio":
         print("Starting in stdio mode...")
         app.run()
     elif len(sys.argv) > 1 and sys.argv[1] == "--ngrok":
-        # Ngrok mode - expose local server to internet
         try:
             import uvicorn
             from pyngrok import ngrok
@@ -275,7 +306,6 @@ if __name__ == "__main__":
             print(f"Starting HTTP server on port {port}...")
             http_app = create_http_app()
 
-            # Start ngrok tunnel
             public_url = ngrok.connect(port)
             print(f"\n{'='*60}")
             print(f"🌐 Server exposed via ngrok!")
@@ -297,7 +327,6 @@ if __name__ == "__main__":
             print("  Terminal 2: ngrok http 8000")
             sys.exit(1)
     else:
-        # HTTP mode (default for local access)
         try:
             import uvicorn
             http_app = create_http_app()

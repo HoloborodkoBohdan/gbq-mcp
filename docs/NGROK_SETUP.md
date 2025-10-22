@@ -75,7 +75,7 @@ Others can connect using the ngrok URL:
 {
   "mcpServers": {
     "bigquery": {
-      "url": "https://abc123.ngrok-free.app"
+      "url": "https://abc123.ngrok-free.app/mcp"
     }
   }
 }

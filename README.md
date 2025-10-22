@@ -128,6 +128,54 @@ curl http://localhost:8000/health
 open http://localhost:8000
 ```
 
+### HTTP Endpoints
+
+The server exposes the following HTTP endpoints:
+
+#### `GET /`
+Root endpoint with service information.
+
+**Response:**
+```json
+{
+  "service": "BigQuery MCP Server",
+  "status": "running",
+  "endpoints": {
+    "health": "/health",
+    "mcp": "/mcp"
+  }
+}
+```
+
+#### `GET /health`
+Health check endpoint for monitoring and load balancers.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "bigquery-mcp",
+  "timestamp": "2025-10-22T08:46:24.271778Z"
+}
+```
+
+**Use cases:**
+- Container health checks (Docker, Kubernetes)
+- Load balancer health probes
+- Monitoring systems (Prometheus, Datadog, etc.)
+- Uptime monitoring
+
+#### `POST /mcp`
+MCP protocol endpoint for tool execution.
+
+This is the main endpoint used by MCP clients to:
+- List available tools
+- Execute queries
+- Get table schemas
+- Estimate costs
+
+**Note:** This endpoint uses the MCP protocol and is typically accessed through MCP clients, not directly via HTTP requests.
+
 ## Testing with MCP Inspector
 
 ```bash
@@ -136,12 +184,13 @@ npx @modelcontextprotocol/inspector python server.py --stdio
 
 ## Available Tools
 
-The server provides 4 tools:
+The server provides 5 tools:
 
-1. **list_tables** - See all available datasets and tables
-2. **get_table_schema** - View table structure and field types
-3. **estimate_query_cost** - Estimate query cost without executing (dry-run)
-4. **bq_query** - Run SELECT queries on allowed tables
+1. **get_query_limits** - View current query limits and BigQuery configuration
+2. **list_tables** - See all available datasets and tables
+3. **get_table_schema** - View table structure and field types
+4. **estimate_query_cost** - Estimate query cost without executing (dry-run)
+5. **bq_query** - Run SELECT queries on allowed tables
 
 ## Security Features
 
@@ -152,10 +201,10 @@ The server provides 4 tools:
 - Removes comments and string literals before validation
 - Validates against allowed table whitelist
 
-**Query Limits:**
-- Maximum 10,000 rows per query
-- 100 MB billing limit per query
-- Table access controlled by whitelist
+**Query Limits (configurable via `.env`):**
+- Maximum 10,000 rows per query (default - set `MAX_QUERY_RESULTS` to change)
+- 100 MB billing limit per query (default - set `MAX_BYTES_BILLED_MB` to change)
+- Table access controlled by `access-control.json`
 
 **Validation Examples:**
 ```sql
@@ -363,25 +412,33 @@ See [tests/README.md](tests/README.md) for detailed testing documentation.
 
 ### Add More Datasets
 
-Edit `ALLOWED_TABLES_CONFIG` in `server.py`:
+Edit `access-control.json` to add more tables or datasets:
 
-```python
-ALLOWED_TABLES_CONFIG = {
-    "bigquery-public-data.dataset_name.table_name": {
-        "description": "What this table contains",
-        "context": "When to use this data",
-        "key_fields": ["important_field1", "important_field2"]
+```json
+{
+  "allowed_tables": [
+    "bigquery-public-data.iowa_liquor_sales.sales",
+    "bigquery-public-data.dataset_name.table_name"
+  ],
+  "allowed_datasets": {
+    "bigquery-public-data.austin_bikeshare": {
+      "allow_all_tables": true,
+      "blacklisted_tables": [],
+      "description": "Austin bike sharing system"
+    },
+    "bigquery-public-data.dataset_name": {
+      "allow_all_tables": true,
+      "blacklisted_tables": ["sensitive_table"],
+      "description": "Your dataset description"
     }
+  },
+  "allowed_patterns": [
+    "bigquery-public-data.*"
+  ]
 }
 ```
 
 Browse public datasets: https://console.cloud.google.com/marketplace/browse?filter=solution-type:dataset
-
-### Customize Safety Limits
-
-Edit `server.py` to adjust:
-- `max_results` limit (currently 10,000 rows)
-- `maximum_bytes_billed` (currently 100 MB)
 
 ### Add Features
 
