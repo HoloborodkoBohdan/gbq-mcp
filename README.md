@@ -192,6 +192,42 @@ The server provides 5 tools:
 4. **estimate_query_cost** - Estimate query cost without executing (dry-run)
 5. **bq_query** - Run SELECT queries on allowed tables
 
+## Available Resources
+
+The server exposes 4 MCP resources for browsable data discovery:
+
+### **`bigquery://tables`**
+List all available tables and patterns you have access to. Provides a quick overview of your data catalog.
+
+### **`bigquery://table/{table_id}/schema`**
+Get detailed schema information for a specific table including:
+- Row count and table size
+- Creation and modification dates
+- Field names, types, and descriptions
+- Formatted as a readable markdown table
+
+**Example:** `bigquery://table/bigquery-public-data.iowa_liquor_sales.sales/schema`
+
+### **`bigquery://datasets`**
+Browse all accessible datasets with their configurations:
+- Datasets with full access
+- Individual table permissions
+- Wildcard patterns
+- Blacklisted tables
+
+### **`bigquery://limits`**
+View current query limits and configuration:
+- Max results per query
+- Billing limits
+- Cost information
+- How to adjust settings
+
+**Benefits of Resources:**
+- 📖 Claude can browse and discover your data without executing tools
+- 🔍 Natural data exploration and schema inspection
+- 💡 Better context for query generation
+- ⚡ Faster responses (no tool execution needed for metadata)
+
 ## Security Features
 
 **Read-Only Enforcement:**
@@ -382,8 +418,8 @@ python tests/run_all_tests.py
 
 **Expected output:**
 ```
-Total Tests:     24
-Passed:          24 ✓
+Total Tests:     54
+Passed:          54 ✓
 Failed:          0
 Pass Rate:       100.0%
 
@@ -392,21 +428,7 @@ Pass Rate:       100.0%
 
 ### Test Coverage
 
-- ✅ **SQL Validation** (14 tests) - Security and query safety
-- ✅ **Feature Tests** (8 tests) - Async lifecycle, HTTP, cost estimation
-- ✅ **Import Tests** (2 tests) - Module availability
-
-### Individual Tests
-
-```bash
-# SQL security validation
-python tests/test_validation.py
-
-# Feature availability
-python tests/test_features.py
-```
-
-See [tests/README.md](tests/README.md) for detailed testing documentation.
+✅ SQL validation, features, and imports - 54 tests total. See [tests/README.md](tests/README.md) for details.
 
 ## What's Next
 

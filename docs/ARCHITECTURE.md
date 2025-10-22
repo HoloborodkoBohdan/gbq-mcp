@@ -9,14 +9,22 @@
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     FastMCP Server (server_refactored.py)       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │ list_tables  │  │ get_schema   │  │  bq_query    │  Tools    │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
-│         │                 │                  │                  │
-│         └─────────────────┴──────────────────┘                  │
-│                           │                                     │
-│                           ▼                                     │
+│                     FastMCP Server (server.py)                  │
+│                                                                 │
+│  ┌─────────────── MCP Tools (5) ────────────────┐               │
+│  │ • get_query_limits  • list_tables            │               │
+│  │ • get_table_schema  • estimate_query_cost    │               │
+│  │ • bq_query                                   │               │
+│  └──────────────────────┬───────────────────────┘               │
+│                         │                                       │
+│  ┌─────────────── MCP Resources (4) ────────────┐               │
+│  │ • bigquery://tables                          │               │
+│  │ • bigquery://table/{id}/schema               │               │
+│  │ • bigquery://datasets                        │               │
+│  │ • bigquery://limits                          │               │
+│  └──────────────────────┬───────────────────────┘               │
+│                         │                                       │
+│                         ▼                                       │
 │                  ┌─────────────────┐                            │
 │                  │  AppContext     │                            │
 │                  │  (Dependency    │                            │
@@ -31,12 +39,12 @@
 │Configuration  │  │ BigQueryClient  │  │ QueryValidator  │
 │   Service     │  │    Service      │  │    Service      │
 ├───────────────┤  ├─────────────────┤  ├─────────────────┤
-│ • AccessConfig│  │ • Initialize    │  │ • Composite     │
-│ • QueryLimits │  │ • Get Client    │  │   Validators    │
-│ • Service Acc │  │ • Close         │  │ • SELECT Only   │
-│ • Project ID  │  │ • Project ID    │  │ • Forbidden KW  │
-└───────┬───────┘  └─────────────────┘  │ • Multi-Stmt    │
-        │                               └─────────────────┘
+│ • .env loader │  │ • Initialize    │  │ • Composite     │
+│ • access-ctrl │  │ • Get Client    │  │   Validators    │
+│   .json       │  │ • Close         │  │ • SELECT Only   │
+│ • QueryLimits │  │ • Project ID    │  │ • Forbidden KW  │
+│ • Service Acc │  │                 │  │ • Multi-Stmt    │
+└───────┬───────┘  └─────────────────┘  └─────────────────┘
         │
         ▼
 ┌─────────────────┐
@@ -70,8 +78,8 @@
 │ + get_service_account_path(): str    │
 └──────────────┬───────────────────────┘
                │
-               ├─────────────────────────────┐
-               │                             │
+               │
+               │                             
                ▼
 ┌──────────────────────────────────────────┐
 │ ConfigurationService                     │

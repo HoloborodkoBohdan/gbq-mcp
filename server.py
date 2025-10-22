@@ -250,6 +250,124 @@ def _handle_query_error(error: Exception) -> ValueError:
         return ValueError(f"Query execution error: {error_msg}")
 
 
+@app.resource("bigquery://tables")
+def list_tables_resource() -> str:
+    """List all available BigQuery tables as a resource."""
+    ctx = get_context()
+    allowed_tables = ctx.access_control.get_all_allowed_tables()
+
+    output = "# Available BigQuery Tables\n\n"
+    output += f"Total accessible tables/patterns: {len(allowed_tables)}\n\n"
+
+    for table in allowed_tables:
+        output += f"- `{table}`\n"
+
+    output += "\n## Usage\n"
+    output += "Use `get_table_schema(table_id)` tool to see detailed schema.\n"
+    output += "Use `bq_query(query)` tool to query the data.\n"
+
+    return output
+
+
+@app.resource("bigquery://table/{table_id}/schema")
+def table_schema_resource(table_id: str) -> str:
+    """Get table schema as a readable resource."""
+    ctx = get_context()
+
+    if not ctx.access_control.is_table_allowed(table_id):
+        return f"# Access Denied\n\nTable '{table_id}' is not in the allowed list."
+
+    try:
+        client = ctx.bq_client_service.get_client()
+        table = client.get_table(table_id)
+
+        output = f"# Schema: {table_id}\n\n"
+        output += f"**Rows:** {table.num_rows:,}\n"
+        output += f"**Size:** {table.num_bytes / (1024**3):.2f} GB\n"
+        output += f"**Created:** {table.created.isoformat() if table.created else 'Unknown'}\n"
+        output += f"**Modified:** {table.modified.isoformat() if table.modified else 'Unknown'}\n\n"
+
+        if table.description:
+            output += f"**Description:** {table.description}\n\n"
+
+        output += "## Fields\n\n"
+        output += "| Field | Type | Mode | Description |\n"
+        output += "|-------|------|------|-------------|\n"
+
+        for field in table.schema:
+            desc = field.description or ""
+            output += f"| {field.name} | {field.field_type} | {field.mode} | {desc} |\n"
+
+        return output
+    except Exception as e:
+        return f"# Error\n\nFailed to fetch schema: {str(e)}"
+
+
+@app.resource("bigquery://limits")
+def query_limits_resource() -> str:
+    """Get current query limits as a resource."""
+    ctx = get_context()
+    query_limits = ctx.config.get_query_limits()
+    project_id = ctx.bq_client_service.get_project_id()
+
+    output = "# BigQuery Query Limits\n\n"
+    output += f"**Project:** {project_id}\n\n"
+    output += "## Current Limits\n\n"
+    output += f"- **Max Results per Query:** {query_limits.max_results:,} rows\n"
+    output += f"- **Max Bytes Billed:** {query_limits.maximum_bytes_billed / (1024**2):.0f} MB "
+    output += f"({query_limits.maximum_bytes_billed / (1024**3):.2f} GB)\n\n"
+    output += "## Cost Information\n\n"
+    output += "- **Rate:** $5.00 per TB (US region)\n"
+    output += "- **Protection:** Queries are automatically checked against billing limits before execution\n"
+    output += "- **Confirmation:** Large queries require explicit confirmation\n\n"
+    output += "## Configuration\n\n"
+    output += "Adjust limits in `.env` file:\n"
+    output += "```bash\n"
+    output += "MAX_QUERY_RESULTS=10000\n"
+    output += "MAX_BYTES_BILLED_MB=100\n"
+    output += "```\n"
+
+    return output
+
+
+@app.resource("bigquery://datasets")
+def list_datasets_resource() -> str:
+    """List all accessible datasets."""
+    ctx = get_context()
+    access_config = ctx.config.get_access_config()
+
+    output = "# Accessible BigQuery Datasets\n\n"
+
+    if access_config.allowed_datasets:
+        output += "## Datasets with Full Access\n\n"
+        for dataset_id, config in access_config.allowed_datasets.items():
+            output += f"### {dataset_id}\n\n"
+            if config.get("description"):
+                output += f"{config['description']}\n\n"
+
+            if config.get("allow_all_tables"):
+                output += "- ✅ All tables accessible\n"
+
+            if config.get("blacklisted_tables"):
+                output += f"- ⛔ Blacklisted: {', '.join(config['blacklisted_tables'])}\n"
+
+            output += "\n"
+
+    if access_config.allowed_tables:
+        output += "## Individual Tables\n\n"
+        for table_id in access_config.allowed_tables:
+            output += f"- `{table_id}`\n"
+        output += "\n"
+
+    if access_config.allowed_patterns:
+        output += "## Wildcard Patterns\n\n"
+        for pattern in access_config.allowed_patterns:
+            output += f"- `{pattern}`\n"
+        output += "\n"
+
+    return output
+
+
 def create_http_app():
     """Create HTTP transport app with CORS middleware for local access and ngrok sharing."""
     try:
